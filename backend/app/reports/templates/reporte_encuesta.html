@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe de Encuestas — Campus Córdoba</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 15mm 20mm 15mm;
+      @bottom-right {
+        content: "Página " counter(page) " de " counter(pages);
+        font-size: 8pt;
+        color: #64748b;
+      }
+      @bottom-left {
+        content: "Campus Córdoba — Plataforma de Análisis de Encuestas";
+        font-size: 8pt;
+        color: #64748b;
+      }
+    }
+
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      line-height: 1.4;
+      font-size: 9.5pt;
+      margin: 0;
+      padding: 0;
+    }
+
+    .header {
+      border-bottom: 2px solid #2563eb;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .header-title {
+      font-size: 16pt;
+      font-weight: bold;
+      color: #1e3a8a;
+      margin: 0 0 4px 0;
+    }
+
+    .header-subtitle {
+      font-size: 10pt;
+      color: #475569;
+      margin: 0;
+    }
+
+    .meta-box {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 18px;
+      font-size: 9pt;
+    }
+
+    .kpi-grid {
+      display: table;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+
+    .kpi-cell {
+      display: table-cell;
+      width: 25%;
+      background-color: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .kpi-cell + .kpi-cell {
+      border-left: none;
+    }
+
+    .kpi-label {
+      font-size: 7.5pt;
+      font-weight: bold;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .kpi-num {
+      font-size: 16pt;
+      font-weight: bold;
+      color: #1e40af;
+    }
+
+    .kpi-desc {
+      font-size: 7.5pt;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .section-title {
+      font-size: 11pt;
+      font-weight: bold;
+      color: #1e293b;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 4px;
+      margin: 18px 0 10px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 8.5pt;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      color: #334155;
+      font-weight: bold;
+      text-align: left;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+    }
+
+    td {
+      padding: 6px 8px;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    .score-badge {
+      font-weight: bold;
+      color: #1e40af;
+      text-align: center;
+    }
+
+    .summary-box {
+      background-color: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      color: #3730a3;
+      font-size: 9pt;
+      line-height: 1.5;
+    }
+
+    .badge-pos { color: #16a34a; font-weight: bold; }
+    .badge-neu { color: #64748b; font-weight: bold; }
+    .badge-neg { color: #dc2626; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <div class="header-title">Informe Ejecutivo de Satisfacción</div>
+      <div class="header-subtitle">Campus Córdoba — Análisis Integral de Capacitación</div>
+    </div>
+  </div>
+
+  <div class="meta-box">
+    <strong>Curso:</strong> {{ course_name }}<br>
+    <strong>Fecha de Emisión:</strong> {{ generated_at }}<br>
+    {% if filter_dates %}<strong>Período evaluado:</strong> {{ filter_dates }}<br>{% endif %}
+  </div>
+
+  <!-- KPIs Principales -->
+  <div class="kpi-grid">
+    <div class="kpi-cell">
+      <div class="kpi-label">Total Encuestas</div>
+      <div class="kpi-num">{{ kpis.total_surveys }}</div>
+      <div class="kpi-desc">Respuestas procesadas</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label">Promedio General</div>
+      <div class="kpi-num">{{ "%.1f"|format(kpis.overall_average) }} / 10</div>
+      <div class="kpi-desc">Escala 1 a 10 (Q01-Q08)</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label">NPS Recomendación</div>
+      <div class="kpi-num">{% if kpis.nps > 0 %}+{% endif %}{{ "%.0f"|format(kpis.nps) }}</div>
+      <div class="kpi-desc">{{ kpis.promoters_pct }}% Promotores</div>
+    </div>
+    <div class="kpi-cell">
+      <div class="kpi-label">Satisfacción General</div>
+      <div class="kpi-num">{{ "%.0f"|format(kpis.satisfaction_pct) }}%</div>
+      <div class="kpi-desc">Calificación >= 8 en Q06</div>
+    </div>
+  </div>
+
+  <!-- Desglose de Preguntas 1 a 8 -->
+  <div class="section-title">1. Evaluación por Dimensión Cuantitativa (Preguntas Q01 a Q08)</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 8%;">Cód.</th>
+        <th style="width: 25%;">Aspecto Evaluado</th>
+        <th style="width: 55%;">Pregunta Oficial</th>
+        <th style="width: 12%; text-align: center;">Promedio</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for q in questions %}
+      <tr>
+        <td style="font-weight: bold; text-align: center;">Q0{{ q.question_number }}</td>
+        <td><strong>{{ q.short_label }}</strong></td>
+        <td>{{ q.description }}</td>
+        <td class="score-badge">{{ "%.2f"|format(q.average) }} / 10</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Análisis de Inteligencia Artificial -->
+  <div class="section-title">2. Análisis Semántico de Inteligencia Artificial (Pregunta Q09)</div>
+  <div class="summary-box">
+    <strong>Resumen Ejecutivo de Sugerencias y Observaciones:</strong><br>
+    {{ ai_insights.summary }}
+  </div>
+
+  <table style="width: 100%; margin-bottom: 14px;">
+    <thead>
+      <tr>
+        <th style="width: 50%;">Distribución de Sentimiento</th>
+        <th style="width: 50%;">Temáticas Más Mencionadas</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="vertical-align: top;">
+          • <span class="badge-pos">Positivos / Elogios:</span> {{ ai_insights.sentiment.positivo or 0 }}<br>
+          • <span class="badge-neu">Neutros / Sin objeción:</span> {{ ai_insights.sentiment.neutro or 0 }}<br>
+          • <span class="badge-neg">Negativos / Reclamos:</span> {{ ai_insights.sentiment.negativo or 0 }}
+        </td>
+        <td style="vertical-align: top;">
+          {% for t in ai_insights.topics[:4] %}
+            • <strong>{{ t.label }}:</strong> {{ t.count }} menciones<br>
+          {% endfor %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Muestra de Comentarios Relevantes -->
+  {% if comments and comments|length > 0 %}
+  <div class="section-title">3. Comentarios Destacados de los Alumnos</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 15%;">Tema</th>
+        <th style="width: 15%;">Sentimiento</th>
+        <th style="width: 70%;">Comentario del Alumno</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in comments[:8] %}
+      <tr>
+        <td>{{ c.topic_label }}</td>
+        <td>
+          {% if c.sentiment == 'positivo' %}<span class="badge-pos">Positivo</span>
+          {% elif c.sentiment == 'negativo' %}<span class="badge-neg">Negativo</span>
+          {% else %}<span class="badge-neu">Neutro</span>{% endif %}
+        </td>
+        <td style="font-style: italic;">"{{ c.text }}"</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+</body>
+</html>
