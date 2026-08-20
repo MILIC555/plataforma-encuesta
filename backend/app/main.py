@@ -1,6 +1,9 @@
 import logging
+# pyrefly: ignore [missing-import]
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
+from fastapi import FastAPI         
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.iniciar_bd import iniciar_base_datos
 from app.api.routes.encuestas import router as router_encuestas

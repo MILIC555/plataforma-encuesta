@@ -1,6 +1,8 @@
+# pyrefly: ignore [missing-import]
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from app.db.models.encuesta import Encuesta
 from app.db.models.curso import Curso

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import BarraNavegacion from "./components/BarraNavegacion";
 import ModalCarga from "./components/ModalCarga";
 import ModalGestionDatos from "./components/ModalGestionDatos";
@@ -25,7 +26,7 @@ export default function App() {
   const [fechaFin, setFechaFin] = useState("");
   const [modalCargaAbierto, setModalCargaAbierto] = useState(false);
   const [modalGestionAbierto, setModalGestionAbierto] = useState(false);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState(true);
 
   const [kpis, setKpis] = useState(null);
   const [datosPreguntas, setDatosPreguntas] = useState([]);
@@ -113,7 +114,26 @@ export default function App() {
           alLimpiar={limpiarFiltros}
         />
 
-        {kpis && kpis.total_surveys > 0 ? (
+        {cargando && !kpis ? (
+          <div
+            className="card"
+            style={{
+              textAlign: "center",
+              padding: "4rem 2rem",
+              background: "white",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "1rem",
+            }}
+          >
+            <Loader2 size={40} className="spin" style={{ color: "var(--primary)" }} />
+            <p style={{ color: "var(--text-muted)", fontSize: "1rem", fontWeight: 600 }}>
+              Calculando métricas y análisis de encuestas...
+            </p>
+          </div>
+        ) : kpis && kpis.total_surveys > 0 ? (
           <>
             {/* Tarjetas de Métricas Clave */}
             <TarjetasKpi kpis={kpis} />

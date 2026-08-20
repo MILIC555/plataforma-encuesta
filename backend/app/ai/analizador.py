@@ -88,6 +88,7 @@ class AnalizadorUnificado(CommentAnalyzer):
         self.client = None
         if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY.startswith("sk-") and len(settings.OPENAI_API_KEY) > 20:
             try:
+                # pyrefly: ignore [missing-import]
                 from openai import OpenAI
                 self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
                 logger.info("OpenAI Analyzer inicializado correctamente.")

@@ -83,7 +83,7 @@ export default function PanelIa({ datosIa, alRecargar }) {
             <MessageSquare size={16} style={{ color: "var(--primary)" }} />
             <span>Sentimiento de las Respuestas</span>
           </h4>
-          
+
           <div style={{ height: "180px", width: "100%" }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>

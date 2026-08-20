@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.db.models.pregunta import Pregunta

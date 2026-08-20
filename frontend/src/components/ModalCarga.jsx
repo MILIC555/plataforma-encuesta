@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { X, UploadCloud, CheckCircle2, AlertCircle, FileSpreadsheet, Trash2 } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { X, UploadCloud, CheckCircle2, AlertCircle, FileSpreadsheet, Trash2, Loader2, ArrowRight, PlusCircle } from "lucide-react";
 import { uploadSurveyFiles } from "../servicios/api";
 
 export default function ModalCarga({ estaAbierto, alCerrar, alCompletarCarga }) {
@@ -9,6 +9,17 @@ export default function ModalCarga({ estaAbierto, alCerrar, alCompletarCarga }) 
   const [error, setError] = useState(null);
   const [arrastrando, setArrastrando] = useState(false);
   const inputRef = useRef(null);
+
+  // Escuchar tecla ESC para cerrar
+  useEffect(() => {
+    const alPresionarTecla = (e) => {
+      if (e.key === "Escape" && estaAbierto) {
+        cerrarModal();
+      }
+    };
+    window.addEventListener("keydown", alPresionarTecla);
+    return () => window.removeEventListener("keydown", alPresionarTecla);
+  }, [estaAbierto]);
 
   if (!estaAbierto) return null;
 
@@ -67,6 +78,12 @@ export default function ModalCarga({ estaAbierto, alCerrar, alCompletarCarga }) 
     }
   };
 
+  const reiniciarParaMasCargas = () => {
+    setArchivos([]);
+    setResultado(null);
+    setError(null);
+  };
+
   const cerrarModal = () => {
     setArchivos([]);
     setResultado(null);
@@ -76,23 +93,42 @@ export default function ModalCarga({ estaAbierto, alCerrar, alCompletarCarga }) 
 
   return (
     <div className="modal-backdrop" onClick={cerrarModal}>
-      <div className="modal-card" style={{ maxWidth: "640px" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+      <div
+        className="modal-card"
+        style={{
+          maxWidth: "640px",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Cabecera del modal */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
           <div>
             <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-main)" }}>
-              Carga de Encuestas (Individual o Masiva)
+              {resultado ? "¡Carga Completada con Éxito!" : "Carga de Encuestas (Individual o Masiva)"}
             </h3>
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-              Podés subir 1 o varios archivos (.csv / .xlsx) simultáneamente. Las encuestas duplicadas se ignorarán automáticamente.
+              {resultado
+                ? "Los datos ya están procesados y calculados en el sistema."
+                : "Podés subir 1 o varios archivos (.csv / .xlsx). Las encuestas duplicadas se ignorarán automáticamente."}
             </p>
           </div>
-          <button className="btn btn-secondary btn-sm" onClick={cerrarModal} style={{ borderRadius: "50%", padding: "0.4rem" }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={cerrarModal}
+            style={{ borderRadius: "50%", padding: "0.45rem", marginLeft: "0.5rem" }}
+            title="Cerrar ventana"
+          >
             <X size={18} />
           </button>
         </div>
 
         {!resultado ? (
           <>
+            {/* Zona de Dropzone */}
             <div
               className={`dropzone ${arrastrando ? "active" : ""}`}
               onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }}
@@ -119,8 +155,23 @@ export default function ModalCarga({ estaAbierto, alCerrar, alCompletarCarga }) 
               </div>
             </div>
 
+            {/* Animación mientras procesa */}
+            {cargando && (
+              <div style={{ marginTop: "1rem", padding: "1rem", background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)", borderRadius: "8px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <Loader2 size={24} className="spin" style={{ color: "var(--primary)" }} />
+                <div>
+                  <p style={{ fontWeight: 700, color: "#1e3a8a", fontSize: "0.9rem" }}>
+                    Procesando e importando {archivos.length} archivo(s)...
+                  </p>
+                  <p style={{ fontSize: "0.75rem", color: "#3b82f6" }}>
+                    Normalizando preguntas, deduplicando respuestas y registrando en la base de datos
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Lista de archivos seleccionados */}
-            {archivos.length > 0 && (
+            {archivos.length > 0 && !cargando && (
               <div style={{ marginTop: "1rem", maxHeight: "180px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>
                   <span>Archivos a procesar ({archivos.length}):</span>
@@ -177,49 +228,84 @@ export default function ModalCarga({ estaAbierto, alCerrar, alCompletarCarga }) 
                 {cargando
                   ? `Procesando ${archivos.length} archivo(s)...`
                   : archivos.length > 1
-                  ? `Procesar ${archivos.length} Archivos Masivamente`
-                  : "Subir e Importar"}
+                    ? `Procesar ${archivos.length} Archivos Masivamente`
+                    : "Subir e Importar"}
               </button>
             </div>
           </>
         ) : (
-          <div style={{ textAlign: "center", padding: "1rem 0" }}>
-            <CheckCircle2 size={52} style={{ color: "var(--success)", margin: "0 auto 1rem auto" }} />
-            <h4 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.5rem" }}>
-              ¡Procesamiento Completado!
-            </h4>
-            <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
-              {resultado.message}
-            </p>
+          /* Pantalla de Éxito / Resumen */
+          <div style={{ padding: "0.5rem 0" }}>
+            <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
+              <CheckCircle2 size={48} style={{ color: "var(--success)", margin: "0 auto 0.5rem auto" }} />
+              <h4 style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-main)" }}>
+                {resultado.imported_surveys > 0
+                  ? `¡Se importaron ${resultado.imported_surveys} encuestas nuevas!`
+                  : "Archivos evaluados sin cambios"}
+              </h4>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+                {resultado.message}
+              </p>
+            </div>
 
-            <div style={{ background: "var(--bg-main)", borderRadius: "8px", padding: "1rem", textAlign: "left", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>Archivos procesados:</span>
-                <strong>{resultado.total_files}</strong>
+            {/* Tarjeta de métricas del lote */}
+            <div style={{ background: "var(--bg-main)", borderRadius: "8px", padding: "1rem", border: "1px solid var(--border-color)", marginBottom: "1.25rem", fontSize: "0.875rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                <div style={{ background: "white", padding: "0.6rem 0.8rem", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "block" }}>Archivos Procesados</span>
+                  <strong style={{ fontSize: "1.1rem", color: "var(--text-main)" }}>{resultado.total_files}</strong>
+                </div>
+                <div style={{ background: "white", padding: "0.6rem 0.8rem", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "block" }}>Filas Totales</span>
+                  <strong style={{ fontSize: "1.1rem", color: "var(--text-main)" }}>{resultado.total_rows}</strong>
+                </div>
+                <div style={{ background: "var(--success-bg)", padding: "0.6rem 0.8rem", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#166534", display: "block" }}>Nuevas Importadas</span>
+                  <strong style={{ fontSize: "1.1rem", color: "var(--success)" }}>+{resultado.imported_surveys}</strong>
+                </div>
+                <div style={{ background: "var(--warning-bg)", padding: "0.6rem 0.8rem", borderRadius: "6px", border: "1px solid #fde68a" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#92400e", display: "block" }}>Duplicadas Omitidas</span>
+                  <strong style={{ fontSize: "1.1rem", color: "var(--warning)" }}>{resultado.skipped_duplicates}</strong>
+                </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>Total filas evaluadas:</span>
-                <strong>{resultado.total_rows}</strong>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>Nuevas encuestas importadas:</span>
-                <strong style={{ color: "var(--success)" }}>+{resultado.imported_surveys}</strong>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>Encuestas duplicadas ignoradas:</span>
-                <strong style={{ color: "var(--warning)" }}>{resultado.skipped_duplicates}</strong>
-              </div>
+
+              {/* Lista compacta y scrolleable de cursos actualizados */}
               {resultado.courses_affected?.length > 0 && (
-                <div style={{ marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
-                  <span style={{ color: "var(--text-muted)" }}>Cursos actualizados:</span>
-                  <p style={{ fontWeight: 600, marginTop: "0.2rem" }}>{resultado.courses_affected.join(", ")}</p>
+                <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "0.6rem" }}>
+                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, display: "block", marginBottom: "0.4rem" }}>
+                    Cursos impactados ({resultado.courses_affected.length}):
+                  </span>
+                  <div style={{ maxHeight: "90px", overflowY: "auto", display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                    {resultado.courses_affected.map((cName, idx) => (
+                      <span key={idx} className="badge badge-neutral" style={{ fontSize: "0.75rem" }}>
+                        {cName}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            <button className="btn btn-primary" style={{ width: "100%" }} onClick={cerrarModal}>
-              Cerrar y Ver Resultados
-            </button>
+            {/* Botones de acción bien destacados */}
+            <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
+              <button
+                className="btn btn-secondary"
+                style={{ flex: 1, justifyContent: "center" }}
+                onClick={reiniciarParaMasCargas}
+              >
+                <PlusCircle size={16} />
+                <span>Cargar Más Archivos</span>
+              </button>
+
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1.5, justifyContent: "center", padding: "0.75rem 1.25rem", fontSize: "0.95rem" }}
+                onClick={cerrarModal}
+              >
+                <span>Ver Resultados en el Tablero</span>
+                <ArrowRight size={18} />
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
+# pyrefly: ignore [missing-import]
 from jinja2 import Environment, FileSystemLoader
+# pyrefly: ignore [missing-import]
 import weasyprint
 
 DIR_PLANTILLAS = os.path.join(os.path.dirname(__file__), "templates")
