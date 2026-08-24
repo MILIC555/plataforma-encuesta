@@ -15,3 +15,8 @@ weasyprint
 jinja2
 openpyxl
 python-dotenv
+transformers
+torch
+tokenizers
+huggingface-hub
+requests

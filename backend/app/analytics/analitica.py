@@ -275,21 +275,40 @@ def obtener_insights_ia(db: Session, id_curso: int = None, fecha_inicio = None, 
         for topic, cant in q_top.group_by(Respuesta.ai_tema).order_by(func.count(Respuesta.id).desc()).all()
     ]
 
-    q_txt = (
-        db.query(Respuesta.valor_texto)
+    # Desglose de respuestas negativas por temática
+    q_neg_top = (
+        db.query(Respuesta.ai_tema, func.count(Respuesta.id))
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
-        .filter(Respuesta.id_pregunta == p9, Respuesta.valor_texto.isnot(None), func.length(Respuesta.valor_texto) > 5)
+        .filter(
+            Respuesta.id_pregunta == p9,
+            Respuesta.ai_sentimiento == "negativo",
+            Respuesta.ai_tema.isnot(None),
+            Respuesta.ai_tema != "sin_comentario"
+        )
     )
     if id_curso:
-        q_txt = q_txt.filter(Encuesta.id_curso == id_curso)
+        q_neg_top = q_neg_top.filter(Encuesta.id_curso == id_curso)
     if fecha_inicio:
-        q_txt = q_txt.filter(Encuesta.fecha_envio >= fecha_inicio)
+        q_neg_top = q_neg_top.filter(Encuesta.fecha_envio >= fecha_inicio)
     if fecha_fin:
-        q_txt = q_txt.filter(Encuesta.fecha_envio <= fecha_fin)
+        q_neg_top = q_neg_top.filter(Encuesta.fecha_envio <= fecha_fin)
 
-    muestra = [r[0] for r in q_txt.limit(30).all()]
+    negativos_por_tema = [
+        {"topic": topic, "label": TOPIC_LABELS.get(topic, topic), "count": cant}
+        for topic, cant in q_neg_top.group_by(Respuesta.ai_tema).order_by(func.count(Respuesta.id).desc()).all()
+    ]
+
     total_comments = sum(sentimientos.values())
-    summary_text = analizador.summarize(muestra) if muestra else "No hay suficientes comentarios registrados."
+    pos = sentimientos.get("positivo", 0)
+    neg = sentimientos.get("negativo", 0)
+    top_destacados = [t["label"] for t in lista_topicos[:2]]
+
+    if total_comments > 0:
+        summary_text = f"Análisis semántico con Hugging Face ({total_comments} opiniones): {pos} valoraciones positivas y {neg} oportunidades de mejora."
+        if top_destacados:
+            summary_text += f" Las dimensiones con mayor volumen de comentarios fueron: {', '.join(top_destacados)}."
+    else:
+        summary_text = "No hay suficientes comentarios registrados."
 
     return {
         "sentiment": sentimientos,
@@ -297,6 +316,11 @@ def obtener_insights_ia(db: Session, id_curso: int = None, fecha_inicio = None, 
         "total_comments": total_comments,
         "total_classified": sum(sentimientos.values()),
         "summary": summary_text,
+        "negative_insights": {
+            "total_negatives": neg,
+            "pct_of_total": round((neg / total_comments * 100), 1) if total_comments > 0 else 0.0,
+            "by_topic": negativos_por_tema,
+        }
     }
 
 

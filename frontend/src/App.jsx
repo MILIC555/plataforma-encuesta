@@ -33,6 +33,7 @@ export default function App() {
   const [comparacionCursos, setComparacionCursos] = useState([]);
   const [tendencias, setTendencias] = useState([]);
   const [datosIa, setDatosIa] = useState(null);
+  const [filtroSentimientoComentarios, setFiltroSentimientoComentarios] = useState("todos");
 
   const filtrosActuales = {
     course_id: cursoSeleccionado,
@@ -85,11 +86,20 @@ export default function App() {
     setCursoSeleccionado(null);
     setFechaInicio("");
     setFechaFin("");
+    setFiltroSentimientoComentarios("todos");
   };
 
   const alActualizarDatos = () => {
     cargarCursos();
     cargarTablero();
+  };
+
+  const enfocarComentariosNegativos = () => {
+    setFiltroSentimientoComentarios("negativo");
+    const elem = document.getElementById("muro-comentarios");
+    if (elem) {
+      elem.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   return (
@@ -143,7 +153,11 @@ export default function App() {
 
             {/* Fila: Panel de IA + Evolución Temporal */}
             <div className="grid-2">
-              <PanelIa datosIa={datosIa} alRecargar={cargarTablero} />
+              <PanelIa
+                datosIa={datosIa}
+                alRecargar={cargarTablero}
+                alFiltrarNegativos={enfocarComentariosNegativos}
+              />
               <GraficoTendencias tendencias={tendencias} />
             </div>
 
@@ -151,7 +165,10 @@ export default function App() {
             <TablaCursos comparacionCursos={comparacionCursos} />
 
             {/* Explorador de Comentarios de Alumnos */}
-            <ExploradorComentarios cursoSeleccionado={cursoSeleccionado} />
+            <ExploradorComentarios
+              cursoSeleccionado={cursoSeleccionado}
+              filtroSentimientoExterno={filtroSentimientoComentarios}
+            />
           </>
         ) : (
           <div
