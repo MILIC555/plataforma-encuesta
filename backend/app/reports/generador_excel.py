@@ -1,14 +1,13 @@
-# pyrefly: ignore [missing-import]
 import io
+import collections
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 # pyrefly: ignore [missing-import]
+from sqlalchemy import text
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
-from app.db.models.encuesta import Encuesta
 from app.db.models.curso import Curso
-from app.db.models.pregunta import Pregunta
-from app.db.models.respuesta import Respuesta
-from app.analytics.analitica import obtener_kpis_tablero, obtener_desglose_preguntas, obtener_insights_ia, _aplicar_filtros
+from app.analytics.analitica import obtener_kpis_tablero, obtener_desglose_preguntas
 
 
 def generar_excel_encuestas(
@@ -100,7 +99,7 @@ def generar_excel_encuestas(
     ws_resumen.column_dimensions["D"].width = 18
 
     # -------------------------------------------------------------
-    # HOJA 2: DETALLE DE ENCUESTAS INDIVIDUALES
+    # HOJA 2: DETALLE DE ENCUESTAS INDIVIDUALES (Consulta Optimizada)
     # -------------------------------------------------------------
     ws_detalle = wb.create_sheet(title="Detalle Respuestas")
     ws_detalle.views.sheetView[0].showGridLines = True
@@ -118,46 +117,77 @@ def generar_excel_encuestas(
         c.fill = relleno_encabezado
         c.alignment = alinear_centro
 
-    # Consultar todas las encuestas y sus respuestas
-    query_encuestas = _aplicar_filtros(db.query(Encuesta), id_curso=id_curso, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin)
-    encuestas = query_encuestas.order_by(Encuesta.fecha_envio.desc()).all()
+    params = {}
+    where_clauses = []
+    if id_curso:
+        where_clauses.append("e.id_curso = :id_curso")
+        params["id_curso"] = id_curso
+    if fecha_inicio:
+        where_clauses.append("e.fecha_envio >= :fecha_inicio")
+        params["fecha_inicio"] = fecha_inicio
+    if fecha_fin:
+        where_clauses.append("e.fecha_envio <= :fecha_fin")
+        params["fecha_fin"] = fecha_fin
 
-    p_objs = {p.id: p.nro_pregunta for p in db.query(Pregunta).all()}
+    where_str = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+    sql_encuestas = f"""
+        SELECT e.id_encuesta, e.id_respuesta_origen, c.nombre_curso, e.fecha_envio, e.periodo_anio, e.periodo_mes, e.periodo_semana
+        FROM encuestas e
+        LEFT JOIN cursos c ON e.id_curso = c.id_curso
+        {where_str}
+        ORDER BY e.fecha_envio DESC
+    """
+    encuestas_rows = db.execute(text(sql_encuestas), params).fetchall()
+
+    if where_clauses:
+        sql_respuestas = f"""
+            SELECT r.id_encuesta, p.nro_pregunta, r.valor_numerico, r.valor_texto, r.ai_tema, r.ai_sentimiento
+            FROM respuestas r
+            JOIN preguntas p ON r.id_pregunta = p.id_pregunta
+            JOIN encuestas e ON r.id_encuesta = e.id_encuesta
+            {where_str}
+        """
+    else:
+        sql_respuestas = """
+            SELECT r.id_encuesta, p.nro_pregunta, r.valor_numerico, r.valor_texto, r.ai_tema, r.ai_sentimiento
+            FROM respuestas r
+            JOIN preguntas p ON r.id_pregunta = p.id_pregunta
+        """
+    respuestas_rows = db.execute(text(sql_respuestas), params).fetchall()
+
+    resp_by_encuesta = collections.defaultdict(dict)
+    for r in respuestas_rows:
+        resp_by_encuesta[r.id_encuesta][r.nro_pregunta] = {
+            "valor_numerico": r.valor_numerico,
+            "valor_texto": r.valor_texto,
+            "ai_tema": r.ai_tema,
+            "ai_sentimiento": r.ai_sentimiento,
+        }
 
     row_num = 2
-    for s in encuestas:
-        num_vals = {i: None for i in range(1, 9)}
-        comment_text = ""
-        ai_topic = ""
-        ai_sent = ""
-
-        for r in s.respuestas:
-            q_num = p_objs.get(r.id_pregunta)
-            if q_num and 1 <= q_num <= 8:
-                num_vals[q_num] = r.valor_numerico
-            elif q_num == 9:
-                comment_text = r.valor_texto or ""
-                ai_topic = r.ai_tema or ""
-                ai_sent = r.ai_sentimiento or ""
+    for s in encuestas_rows:
+        s_resp = resp_by_encuesta.get(s.id_encuesta, {})
+        q9 = s_resp.get(9, {})
 
         row_data = [
             s.id_respuesta_origen,
-            s.curso.nombre if s.curso else "",
+            s.nombre_curso or "",
             s.fecha_envio.strftime("%Y-%m-%d %H:%M:%S") if s.fecha_envio else "",
             s.periodo_anio,
             s.periodo_mes,
             s.periodo_semana,
-            num_vals[1],
-            num_vals[2],
-            num_vals[3],
-            num_vals[4],
-            num_vals[5],
-            num_vals[6],
-            num_vals[7],
-            num_vals[8],
-            comment_text,
-            ai_topic,
-            ai_sent,
+            s_resp.get(1, {}).get("valor_numerico"),
+            s_resp.get(2, {}).get("valor_numerico"),
+            s_resp.get(3, {}).get("valor_numerico"),
+            s_resp.get(4, {}).get("valor_numerico"),
+            s_resp.get(5, {}).get("valor_numerico"),
+            s_resp.get(6, {}).get("valor_numerico"),
+            s_resp.get(7, {}).get("valor_numerico"),
+            s_resp.get(8, {}).get("valor_numerico"),
+            q9.get("valor_texto") or "",
+            q9.get("ai_tema") or "",
+            q9.get("ai_sentimiento") or "",
         ]
 
         for col_idx, val in enumerate(row_data, 1):
@@ -183,3 +213,4 @@ def generar_excel_encuestas(
 
 # Alias de compatibilidad
 build_survey_excel = generar_excel_encuestas
+

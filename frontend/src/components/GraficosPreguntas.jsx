@@ -13,7 +13,7 @@ import {
   PolarRadiusAxis,
   Radar,
 } from "recharts";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Info } from "lucide-react";
 
 export default function GraficosPreguntas({ datosPreguntas }) {
   const [tipoGrafico, setTipoGrafico] = useState("bar"); // "bar" | "radar"
@@ -26,6 +26,8 @@ export default function GraficosPreguntas({ datosPreguntas }) {
     nombreCompleto: q.description,
     promedio: q.average,
     cantidad: q.count,
+    textOptions: q.text_options || [],
+    textCount: q.text_count || 0,
   }));
 
   const TooltipPersonalizado = ({ active, payload }) => {
@@ -43,6 +45,16 @@ export default function GraficosPreguntas({ datosPreguntas }) {
             <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Calificación Promedio:</span>
             <strong style={{ fontSize: "1.1rem", color: "var(--primary)" }}>{data.promedio} / 10</strong>
           </div>
+          {data.textOptions && data.textOptions.length > 0 && (
+            <div style={{ marginTop: "0.4rem", borderTop: "1px dashed var(--border-color)", paddingTop: "0.4rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+              {data.textOptions.map((opt, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{opt.label}:</span>
+                  <strong>{opt.count} resp.</strong>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       );
     }
@@ -55,10 +67,10 @@ export default function GraficosPreguntas({ datosPreguntas }) {
         <div>
           <h3 className="card-title">
             <BarChart3 size={20} style={{ color: "var(--primary)" }} />
-            <span>Desempeño por Dimensión (Preguntas Q01 a Q08)</span>
+            <span>Desempeño por Dimensión ({datosPreguntas.length} Preguntas Evaluadas)</span>
           </h3>
           <p className="card-subtitle">
-            Evaluación detallada en escala del 1 al 10 para cada aspecto del curso
+            Calificación en escala del 1 al 10 e incidencias no numéricas
           </p>
         </div>
 
@@ -100,32 +112,51 @@ export default function GraficosPreguntas({ datosPreguntas }) {
         </ResponsiveContainer>
       </div>
 
-      {/* Resumen inferior */}
+      {/* Resumen inferior con badges para opciones textuales */}
       <div style={{ marginTop: "1.5rem", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
         {datosPreguntas.map((q) => (
           <div
-            key={q.question_number}
+            key={`${q.platform || 'p'}-${q.question_number}`}
             style={{
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "0.6rem 0.85rem",
+              flexDirection: "column",
+              gap: "0.35rem",
+              padding: "0.75rem 0.95rem",
               background: "var(--bg-main)",
               borderRadius: "8px",
               border: "1px solid var(--border-color)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ fontWeight: 700, fontSize: "0.8rem", color: "var(--primary)", background: "var(--primary-light)", padding: "0.15rem 0.4rem", borderRadius: "4px" }}>
-                Q0{q.question_number}
-              </span>
-              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                {q.short_label}
-              </span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{ fontWeight: 700, fontSize: "0.8rem", color: "var(--primary)", background: "var(--primary-light)", padding: "0.15rem 0.4rem", borderRadius: "4px" }}>
+                  Q0{q.question_number}
+                </span>
+                <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  {q.short_label}
+                </span>
+              </div>
+              <strong style={{ fontSize: "0.95rem", color: q.average >= 9 ? "var(--success)" : q.average >= 7 ? "var(--primary)" : "var(--warning)" }}>
+                {q.average.toFixed(2)}
+              </strong>
             </div>
-            <strong style={{ fontSize: "0.95rem", color: q.average >= 9 ? "var(--success)" : q.average >= 7 ? "var(--primary)" : "var(--warning)" }}>
-              {q.average.toFixed(2)}
-            </strong>
+
+            {/* Opciones textuales especiales si existen (ej. 'No me comuniqué con el tutor') */}
+            {q.text_options && q.text_options.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.2rem" }}>
+                {q.text_options.map((opt, oIdx) => (
+                  <span
+                    key={oIdx}
+                    className="badge badge-neutral"
+                    style={{ fontSize: "0.7rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                    title={`Opción especial seleccionada por ${opt.count} participante(s)`}
+                  >
+                    <Info size={11} />
+                    <span>{opt.label}: <strong>{opt.count}</strong></span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

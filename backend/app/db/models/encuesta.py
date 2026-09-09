@@ -1,5 +1,5 @@
 # pyrefly: ignore [missing-import]
-from sqlalchemy import Column, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -7,12 +7,13 @@ from app.db.base import Base
 
 class Encuesta(Base):
     """
-    Entidad Encuesta según el diagrama ERD:
-    (idEncuesta, idCurso FK, fechaEnvio, idRespuestaOrigen, periodos).
+    Entidad Encuesta:
+    (idEncuesta, plataforma, idCurso FK, fechaEnvio, idRespuestaOrigen, periodos).
     """
     __tablename__ = "encuestas"
 
     id = Column("id_encuesta", Integer, primary_key=True, index=True)
+    plataforma = Column("plataforma", String(50), nullable=False, default="campus_cordoba", index=True)
     id_respuesta_origen = Column("id_respuesta_origen", Integer, unique=True, nullable=False, index=True)
 
     id_curso = Column("id_curso", Integer, ForeignKey("cursos.id_curso"), nullable=False, index=True)

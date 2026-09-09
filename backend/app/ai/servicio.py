@@ -1,7 +1,10 @@
 from datetime import datetime
 import logging
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
+# pyrefly: ignore [missing-import]
 from app.db.models.respuesta import Respuesta
+# pyrefly: ignore [missing-import]
 from app.db.models.pregunta import Pregunta
 from app.ai.analizador import analizador
 
@@ -10,17 +13,17 @@ logger = logging.getLogger(__name__)
 
 def procesar_comentarios_pendientes(db: Session, limite: int = 500) -> dict:
     """
-    Busca comentarios de la pregunta 9 que aún no hayan sido clasificados
-    y los procesa en lote con el analizador de Hugging Face.
+    Busca comentarios de preguntas abiertas (Q9 Córdoba o Q5 Empleados)
+    que aún no hayan sido clasificados y los procesa con Hugging Face.
     """
-    p9 = db.query(Pregunta).filter(Pregunta.nro_pregunta == 9).first()
-    if not p9:
-        return {"processed": 0, "message": "Pregunta 9 no encontrada en catálogo"}
+    text_p_ids = [p.id for p in db.query(Pregunta.id).filter(Pregunta.tipo == "texto").all()]
+    if not text_p_ids:
+        return {"processed": 0, "message": "Preguntas de texto no encontradas en catálogo"}
 
     pendientes = (
         db.query(Respuesta)
         .filter(
-            Respuesta.id_pregunta == p9.id,
+            Respuesta.id_pregunta.in_(text_p_ids),
             Respuesta.valor_texto.isnot(None),
             Respuesta.ai_tema.is_(None),
         )
@@ -33,7 +36,7 @@ def procesar_comentarios_pendientes(db: Session, limite: int = 500) -> dict:
 
     textos = [resp.valor_texto for resp in pendientes]
     
-    # Inferencia en lote optimizada
+    # Inferencia en lote con Hugging Face
     if hasattr(analizador, "classify_batch"):
         clasificaciones = analizador.classify_batch(textos)
     else:

@@ -149,7 +149,9 @@ export default function ModalGestionDatos({ estaAbierto, alCerrar, cursos, alAct
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <BookOpen size={16} style={{ color: "var(--primary)", flexShrink: 0 }} />
                     <div>
-                      <div style={{ fontWeight: 600, color: "var(--text-main)" }}>{c.name}</div>
+                      <div style={{ fontWeight: 600, color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span>{c.name}</span>
+                      </div>
                       <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         {c.total_surveys !== undefined ? `${c.total_surveys} encuestas` : "Curso activo"}
                       </div>

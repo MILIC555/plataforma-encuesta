@@ -1,5 +1,8 @@
+# pyrefly: ignore [missing-import]
 from datetime import datetime
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, Query
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.analytics.analitica import (
@@ -26,6 +29,7 @@ def _parsear_fecha(date_str: str | None):
 @router.get("/kpis")
 def kpis(
     course_id: int | None = Query(None, description="Filtrar por ID de curso"),
+    platform: str | None = Query(None, description="Filtrar por plataforma (campus_cordoba | campus_empleados)"),
     start_date: str | None = Query(None, description="Fecha de inicio (YYYY-MM-DD)"),
     end_date: str | None = Query(None, description="Fecha de fin (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
@@ -36,27 +40,31 @@ def kpis(
         id_curso=course_id,
         fecha_inicio=_parsear_fecha(start_date),
         fecha_fin=_parsear_fecha(end_date),
+        plataforma=platform,
     )
 
 
 @router.get("/questions")
 def preguntas_desglose(
     course_id: int | None = Query(None, description="Filtrar por ID de curso"),
+    platform: str | None = Query(None, description="Filtrar por plataforma (campus_cordoba | campus_empleados)"),
     start_date: str | None = Query(None, description="Fecha de inicio (YYYY-MM-DD)"),
     end_date: str | None = Query(None, description="Fecha de fin (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
 ):
-    """Devuelve promedios y distribución para las 8 preguntas numéricas."""
+    """Devuelve promedios y distribución para las preguntas (9 de Córdoba o 5 de Empleados)."""
     return obtener_desglose_preguntas(
         db,
         id_curso=course_id,
         fecha_inicio=_parsear_fecha(start_date),
         fecha_fin=_parsear_fecha(end_date),
+        plataforma=platform,
     )
 
 
 @router.get("/courses")
 def comparativa_cursos(
+    platform: str | None = Query(None, description="Filtrar por plataforma (campus_cordoba | campus_empleados)"),
     start_date: str | None = Query(None, description="Fecha de inicio (YYYY-MM-DD)"),
     end_date: str | None = Query(None, description="Fecha de fin (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
@@ -66,21 +74,24 @@ def comparativa_cursos(
         db,
         fecha_inicio=_parsear_fecha(start_date),
         fecha_fin=_parsear_fecha(end_date),
+        plataforma=platform,
     )
 
 
 @router.get("/trends")
 def tendencias_temporales(
     course_id: int | None = Query(None, description="Filtrar por ID de curso"),
+    platform: str | None = Query(None, description="Filtrar por plataforma (campus_cordoba | campus_empleados)"),
     db: Session = Depends(get_db),
 ):
     """Devuelve la evolución temporal de encuestas y calificaciones promedio."""
-    return obtener_tendencias_temporales(db, id_curso=course_id)
+    return obtener_tendencias_temporales(db, id_curso=course_id, plataforma=platform)
 
 
 @router.get("/ai-insights")
 def insights_ia(
     course_id: int | None = Query(None, description="Filtrar por ID de curso"),
+    platform: str | None = Query(None, description="Filtrar por plataforma (campus_cordoba | campus_empleados)"),
     start_date: str | None = Query(None, description="Fecha de inicio (YYYY-MM-DD)"),
     end_date: str | None = Query(None, description="Fecha de fin (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
@@ -91,12 +102,14 @@ def insights_ia(
         id_curso=course_id,
         fecha_inicio=_parsear_fecha(start_date),
         fecha_fin=_parsear_fecha(end_date),
+        plataforma=platform,
     )
 
 
 @router.get("/comments")
 def listar_comentarios(
     course_id: int | None = Query(None, description="Filtrar por ID de curso"),
+    platform: str | None = Query(None, description="Filtrar por plataforma (campus_cordoba | campus_empleados)"),
     topic: str | None = Query(None, description="Filtrar por tópico"),
     sentiment: str | None = Query(None, description="Filtrar por sentimiento"),
     search: str | None = Query(None, description="Búsqueda por texto"),
@@ -104,13 +117,14 @@ def listar_comentarios(
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
-    """Devuelve los comentarios abiertos (pregunta 9) con filtros aplicables."""
+    """Devuelve los comentarios abiertos (pregunta 9 de Córdoba o 5 de Empleados) con filtros aplicables."""
     return obtener_lista_comentarios(
         db,
         id_curso=course_id,
         tema=topic,
         sentimiento=sentiment,
         busqueda=search,
+        plataforma=platform,
         pagina=page,
         tamanio_pagina=page_size,
     )

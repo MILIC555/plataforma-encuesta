@@ -12,15 +12,10 @@ export default function BarraFiltros({
   alLimpiar,
 }) {
   return (
-    <div className="filter-card">
+    <div className="filter-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
       <div className="filter-group">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 600, fontSize: "0.9rem", color: "var(--text-main)", marginRight: "0.5rem" }}>
-          <Filter size={18} style={{ color: "var(--primary)" }} />
-          <span>Filtros de Análisis:</span>
-        </div>
-
         <div className="filter-item">
-          <BookOpen size={16} />
+          <BookOpen size={16} style={{ color: "var(--primary)" }} />
           <select
             className="select-input"
             value={cursoSeleccionado || ""}
@@ -36,7 +31,7 @@ export default function BarraFiltros({
         </div>
 
         <div className="filter-item">
-          <Calendar size={16} />
+          <Calendar size={16} style={{ color: "var(--primary)" }} />
           <input
             type="date"
             className="text-input"

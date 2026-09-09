@@ -31,14 +31,18 @@ PATRONES_NEGATIVOS = [
     "falta de respeto", "una lástima", "una lastima", "insatisfecho", "insatisfecha", "faltó explicación",
     "falto explicacion", "faltó práctica", "falto practica", "sin soporte", "incompleto", "inadecuado",
     "desprolijo", "no recomiendo", "aburrido", "enlatado", "lento", "difícil y sin ayuda", "dificil y sin ayuda",
-    "nunca me llegó", "nunca me llego", "no contestan", "no responden", "pésima atención", "pesima atencion"
+    "nunca me llegó", "nunca me llego", "no contestan", "no responden", "pésima atención", "pesima atencion",
+    "no actualizan", "examen muy largo", "muy largo el examen", "confusa"
 ]
 
 PATRONES_POSITIVOS = [
     "excelente", "muy bueno", "muy buena", "buenísimo", "buenisimo", "me gustó mucho", "me gusto mucho",
-    "me encantó", "me encanto", "muchas gracias", "felicitaciones", "genial", "completo", "muy útil",
-    "muy util", "llevadero", "muy claro", "super claro", "recomiendo", "ameno", "satisfecho", "satisfecha",
-    "impecable", "gran curso", "gran tutor", "gran docente", "excelente oportunidad"
+    "me gustó", "me gusto", "me encantó", "me encanto", "muchas gracias", "felicitaciones", "genial", "completo",
+    "muy útil", "muy util", "llevadero", "muy claro", "super claro", "recomiendo", "ameno", "satisfecho",
+    "satisfecha", "impecable", "gran curso", "gran tutor", "gran docente", "excelente oportunidad",
+    "muy linda", "muy lindo", "formidable", "hermoso", "hermosa", "de diez", "de diez!", "excelentes",
+    "buenas explicaciones", "muy práctico", "muy practico", "muy conforme", "gracias", "super util",
+    "util y claro", "agradezco", "aprendi muchisimo", "aprendí muchísimo"
 ]
 
 
@@ -50,7 +54,7 @@ class AnalizadorReglas(CommentAnalyzer):
 
     def classify(self, comment: str) -> ClassificationResult:
         texto = comment.strip().lower()
-        if not texto or len(texto) <= 2:
+        if not texto or len(texto) <= 1:
             return {"topic": "sin_comentario", "sentiment": "neutro"}
 
         conteo_pos = sum(1 for w in PATRONES_POSITIVOS if w in texto)
@@ -63,17 +67,17 @@ class AnalizadorReglas(CommentAnalyzer):
             sentimiento = "positivo"
 
         # Tópicos
-        if any(w in texto for w in ["docente", "tutor", "profesor", "profe", "tutoría", "tutora"]):
-            tema = "tutor_docente"
-        elif any(w in texto for w in ["material", "contenido", "video", "videos", "módulo", "modulo", "textos", "teoria", "lectura", "pdf"]):
-            tema = "contenidos_material"
-        elif any(w in texto for w in ["plataforma", "aula virtual", "campus", "web", "sistema", "acceso", "login", "pagina", "página"]):
-            tema = "aula_virtual_plataforma"
-        elif any(w in texto for w in ["administrativa", "administracion", "administración", "consulta", "tramite", "trámite", "certificado"]):
-            tema = "administracion_gestion"
-        elif any(w in texto for w in ["sugiero", "mas clases", "más clases", "intercambiar", "practicas", "prácticas", "agregaria", "agregaría", "mejorar", "estaria bueno", "estaría bueno"]):
+        if any(w in texto for w in ["sugiero", "sugerencia", "estaría bueno", "estaria bueno", "sería bueno", "seria bueno", "agregaría", "agregaria", "más clases", "mas clases", "más ejemplos", "mas ejemplos", "más casos", "podrían", "podrian", "deberían", "deberian", "se podría", "se podria", "propuesta", "ampliar", "profundizar"]):
             tema = "sugerencias_mejora"
-        elif sentimiento == "positivo" and any(w in texto for w in ["gracias", "felicitaciones", "excelente", "encantó", "encanto", "buen curso", "oportunidad"]):
+        elif any(w in texto for w in ["docente", "tutor", "profesor", "profe", "tutoría", "tutora", "tutores"]):
+            tema = "tutor_docente"
+        elif any(w in texto for w in ["plataforma", "aula virtual", "campus", "web", "sistema", "acceso", "login", "pagina", "página", "foro"]):
+            tema = "aula_virtual_plataforma"
+        elif any(w in texto for w in ["administrativa", "administracion", "administración", "consulta", "tramite", "trámite", "certificado", "secretaría", "subdirección"]):
+            tema = "administracion_gestion"
+        elif any(w in texto for w in ["material", "contenido", "video", "videos", "módulo", "modulo", "textos", "teoria", "lectura", "pdf", "audio", "audios", "diapositivas"]):
+            tema = "contenidos_material"
+        elif sentimiento == "positivo" or any(w in texto for w in ["gracias", "felicitaciones", "excelente", "encantó", "encanto", "buen curso", "oportunidad", "lindo curso", "hermoso", "genial"]):
             tema = "felicitaciones_general"
         else:
             tema = "otro"
@@ -150,8 +154,7 @@ class AnalizadorHuggingFace(CommentAnalyzer):
 
     def _calibrar_sentimiento(self, texto: str, sentimiento_modelo: str) -> str:
         """
-        Calibra el sentimiento combinando el modelo neuronal con detección sensible de quejas/críticas.
-        Evita que comentarios de frustración o reclamos queden catalogados falsamente como 'neutros'.
+        Calibra el sentimiento combinando el modelo neuronal con detección sensible de quejas/críticas y elogios.
         """
         t_low = texto.lower()
         conteo_neg = sum(1 for p in PATRONES_NEGATIVOS if p in t_low)
@@ -171,16 +174,18 @@ class AnalizadorHuggingFace(CommentAnalyzer):
     def _detectar_topico_con_prioridad(self, texto: str, prediccion_zero_shot: str | None = None) -> str:
         """Combina reglas de alta certeza léxica con inferencia semántica Zero-Shot."""
         t_low = texto.lower()
-        if any(w in t_low for w in ["docente", "tutor", "profesor", "profe", "tutora", "tutoría"]):
-            return "tutor_docente"
-        if any(w in t_low for w in ["plataforma", "aula virtual", "campus", "sitio web", "caída de la página", "no me dejaba ingresar"]):
-            return "aula_virtual_plataforma"
-        if any(w in t_low for w in ["certificado", "tramite", "trámite", "administracion", "administración", "secretaría"]):
-            return "administracion_gestion"
-        if any(w in t_low for w in ["sugiero", "estaría bueno", "estaria bueno", "agregaría", "agregaria", "más clases", "mas clases", "más tiempo"]):
+        if any(w in t_low for w in ["sugiero", "sugerencia", "estaría bueno", "estaria bueno", "sería bueno", "seria bueno", "agregaría", "agregaria", "más clases", "mas clases", "más ejemplos", "mas ejemplos", "más casos", "podrían", "podrian", "deberían", "deberian", "se podría", "se podria", "propuesta", "ampliar", "profundizar"]):
             return "sugerencias_mejora"
-        if any(w in t_low for w in ["material", "videos", "video", "lecturas", "pdf", "módulos", "modulos", "contenido", "contenidos"]):
+        if any(w in t_low for w in ["docente", "tutor", "profesor", "profe", "tutora", "tutoría", "tutores"]):
+            return "tutor_docente"
+        if any(w in t_low for w in ["plataforma", "aula virtual", "campus", "sitio web", "caída de la página", "no me dejaba ingresar", "foro"]):
+            return "aula_virtual_plataforma"
+        if any(w in t_low for w in ["certificado", "tramite", "trámite", "administracion", "administración", "secretaría", "subdirección"]):
+            return "administracion_gestion"
+        if any(w in t_low for w in ["material", "videos", "video", "lecturas", "pdf", "módulos", "modulos", "contenido", "contenidos", "audio", "audios", "diapositivas"]):
             return "contenidos_material"
+        if any(w in t_low for w in ["excelente", "gracias", "muchas gracias", "felicitaciones", "genial", "muy bueno", "muy buena", "hermoso", "lindo curso", "buen curso"]):
+            return "felicitaciones_general"
         
         if prediccion_zero_shot:
             return prediccion_zero_shot
@@ -236,7 +241,7 @@ class AnalizadorHuggingFace(CommentAnalyzer):
     def classify(self, comment: str) -> ClassificationResult:
         """Clasifica un comentario individual."""
         texto = comment.strip()
-        if not texto or len(texto) <= 2:
+        if not texto or len(texto) <= 1:
             return {"topic": "sin_comentario", "sentiment": "neutro"}
 
         res_api = self._clasificar_con_api_hf(texto)
@@ -284,7 +289,7 @@ class AnalizadorHuggingFace(CommentAnalyzer):
 
         for idx, c in enumerate(comments):
             txt = (c or "").strip()
-            if not txt or len(txt) <= 2:
+            if not txt or len(txt) <= 1:
                 resultados.append({"topic": "sin_comentario", "sentiment": "neutro"})
             else:
                 resultados.append(None)

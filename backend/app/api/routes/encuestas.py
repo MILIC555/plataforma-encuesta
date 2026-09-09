@@ -27,7 +27,7 @@ async def subir_archivos_encuestas(
             detail="No se enviaron archivos para procesar.",
         )
 
-    extensiones_validas = (".csv", ".xlsx", ".xls")
+    extensiones_validas = (".csv", ".xlsx", ".xls", ".pdf")
     lista_para_procesar = []
 
     for item in files:
@@ -40,7 +40,7 @@ async def subir_archivos_encuestas(
     if not lista_para_procesar:
         raise HTTPException(
             status_code=400,
-            detail="Ninguno de los archivos enviados tiene un formato válido (.csv, .xlsx, .xls).",
+            detail="Ninguno de los archivos enviados tiene un formato válido (.csv, .xlsx, .xls, .pdf).",
         )
 
     try:
@@ -71,17 +71,19 @@ def listar_preguntas(db: Session = Depends(get_db)):
 
 @router.get("/courses")
 def listar_cursos(db: Session = Depends(get_db)):
-    """Devuelve todos los cursos registrados con su conteo de encuestas."""
+    """Devuelve todos los cursos registrados con su conteo de encuestas y plataforma."""
     cursos = db.query(Curso).order_by(Curso.nombre).all()
     resultado = []
     for c in cursos:
         conteo = db.query(Encuesta).filter(Encuesta.id_curso == c.id).count()
+        plat = db.query(Encuesta.plataforma).filter(Encuesta.id_curso == c.id).first()
+        plat_val = plat[0] if plat else "campus_cordoba"
         resultado.append({
             "id": c.id,
             "name": c.nombre,
             "code": c.codigo,
-            "institution": c.institucion,
-            "department": c.departamento,
+            "platform": "campus_cordoba",
+            "platform_label": "Campus Córdoba",
             "total_surveys": conteo,
         })
     return resultado

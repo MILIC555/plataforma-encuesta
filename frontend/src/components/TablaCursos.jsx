@@ -10,7 +10,7 @@ export default function TablaCursos({ comparacionCursos }) {
         <div>
           <h3 className="card-title">
             <GraduationCap size={20} style={{ color: "var(--primary)" }} />
-            <span>Comparativa de Rendimiento por Curso</span>
+            <span>Comparativa de Rendimiento por Curso (Campus Córdoba)</span>
           </h3>
           <p className="card-subtitle">
             Ranking comparativo de satisfacción, NPS y volumen de respuestas
@@ -23,7 +23,6 @@ export default function TablaCursos({ comparacionCursos }) {
           <thead>
             <tr>
               <th>Curso</th>
-              <th>Institución / Depto</th>
               <th style={{ textAlign: "center" }}>Encuestas</th>
               <th style={{ textAlign: "center" }}>Promedio Global</th>
               <th style={{ textAlign: "center" }}>NPS Score</th>
@@ -34,9 +33,6 @@ export default function TablaCursos({ comparacionCursos }) {
             {comparacionCursos.map((c) => (
               <tr key={c.id}>
                 <td style={{ fontWeight: 600 }}>{c.name}</td>
-                <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                  {c.institution || "Campus Córdoba"} {c.department ? `— ${c.department}` : ""}
-                </td>
                 <td style={{ textAlign: "center", fontWeight: 700 }}>{c.total_surveys}</td>
                 <td style={{ textAlign: "center" }}>
                   <span

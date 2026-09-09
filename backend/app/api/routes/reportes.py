@@ -1,5 +1,7 @@
 from datetime import datetime
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, Query, Response as FastAPIResponse
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from app.db.base import get_db
 from app.db.models.curso import Curso

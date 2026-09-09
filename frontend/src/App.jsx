@@ -148,7 +148,7 @@ export default function App() {
             {/* Tarjetas de Métricas Clave */}
             <TarjetasKpi kpis={kpis} />
 
-            {/* Desglose de Preguntas 1 a 8 */}
+            {/* Desglose de Preguntas Canónicas */}
             <GraficosPreguntas datosPreguntas={datosPreguntas} />
 
             {/* Fila: Panel de IA + Evolución Temporal */}
@@ -166,6 +166,7 @@ export default function App() {
 
             {/* Explorador de Comentarios de Alumnos */}
             <ExploradorComentarios
+              cursos={cursos}
               cursoSeleccionado={cursoSeleccionado}
               filtroSentimientoExterno={filtroSentimientoComentarios}
             />
@@ -181,10 +182,10 @@ export default function App() {
             }}
           >
             <h3 style={{ fontSize: "1.3rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.5rem" }}>
-              No hay encuestas registradas todavía
+              No hay encuestas registradas para el filtro seleccionado
             </h3>
             <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", maxWidth: "500px", margin: "0 auto 1.5rem auto" }}>
-              Hacé clic en el botón a continuación para subir uno o múltiples archivos CSV o Excel exportados de Campus Córdoba.
+              Podés subir archivos CSV, Excel o PDF de encuestas de Campus Córdoba haciendo clic a continuación.
             </p>
             <button className="btn btn-primary" onClick={() => setModalCargaAbierto(true)}>
               Cargar Archivos de Encuestas

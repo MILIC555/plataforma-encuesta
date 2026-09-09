@@ -10,7 +10,7 @@ from app.ai.base import TOPIC_LABELS
 from app.ai.analizador import analizador
 
 
-def _filtrar_encuestas(query, id_curso=None, fecha_inicio=None, fecha_fin=None):
+def _filtrar_encuestas(query, id_curso=None, fecha_inicio=None, fecha_fin=None, plataforma=None):
     if id_curso:
         query = query.filter(Encuesta.id_curso == id_curso)
     if fecha_inicio:
@@ -20,12 +20,13 @@ def _filtrar_encuestas(query, id_curso=None, fecha_inicio=None, fecha_fin=None):
     return query
 
 
-def obtener_kpis_tablero(db: Session, id_curso: int = None, fecha_inicio = None, fecha_fin = None) -> dict:
-    """Calcula KPIs instantáneamente con una sola consulta agregada optimizada."""
-    q_enc = _filtrar_encuestas(db.query(func.count(Encuesta.id)), id_curso, fecha_inicio, fecha_fin)
+def obtener_kpis_tablero(db: Session, id_curso: int = None, fecha_inicio = None, fecha_fin = None, plataforma: str = None) -> dict:
+    """Calcula KPIs agregados por SQL para Campus Córdoba."""
+    q_enc = _filtrar_encuestas(db.query(func.count(distinct(Encuesta.id))), id_curso, fecha_inicio, fecha_fin)
     total_encuestas = q_enc.scalar() or 0
 
-    total_cursos = db.query(func.count(Curso.id)).scalar() or 0
+    q_cur = db.query(func.count(distinct(Curso.id))).join(Encuesta, Curso.id == Encuesta.id_curso)
+    total_cursos = q_cur.scalar() or 0
 
     if total_encuestas == 0:
         return {
@@ -36,10 +37,12 @@ def obtener_kpis_tablero(db: Session, id_curso: int = None, fecha_inicio = None,
             "promoters_pct": 0.0,
             "detractors_pct": 0.0,
             "total_courses": total_cursos,
+            "platform": "campus_cordoba",
         }
 
-    p6 = db.query(Pregunta.id).filter(Pregunta.nro_pregunta == 6).scalar()
-    p8 = db.query(Pregunta.id).filter(Pregunta.nro_pregunta == 8).scalar()
+    # IDs de preguntas de referencia en Campus Córdoba (Q6 y Q8)
+    p6 = db.query(Pregunta.id).filter(Pregunta.plataforma == "campus_cordoba", Pregunta.nro_pregunta == 6).scalar()
+    p8 = db.query(Pregunta.id).filter(Pregunta.plataforma == "campus_cordoba", Pregunta.nro_pregunta == 8).scalar()
 
     q = (
         db.query(
@@ -53,26 +56,20 @@ def obtener_kpis_tablero(db: Session, id_curso: int = None, fecha_inicio = None,
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
     )
 
-    if id_curso:
-        q = q.filter(Encuesta.id_curso == id_curso)
-    if fecha_inicio:
-        q = q.filter(Encuesta.fecha_envio >= fecha_inicio)
-    if fecha_fin:
-        q = q.filter(Encuesta.fecha_envio <= fecha_fin)
-
+    q = _filtrar_encuestas(q, id_curso, fecha_inicio, fecha_fin)
     res = q.first()
 
     prom_gral = round(float(res.prom_gral), 2) if res and res.prom_gral else 0.0
     
-    total_p8 = res.total_p8 or 0
-    promotores = res.promotores or 0
-    detractores = res.detractores or 0
+    total_p8 = res.total_p8 or 0 if res else 0
+    promotores = res.promotores or 0 if res else 0
+    detractores = res.detractores or 0 if res else 0
     nps_score = round(((promotores - detractores) / total_p8) * 100, 1) if total_p8 > 0 else 0.0
     promoters_pct = round((promotores / total_p8) * 100, 1) if total_p8 > 0 else 0.0
     detractors_pct = round((detractores / total_p8) * 100, 1) if total_p8 > 0 else 0.0
 
-    total_p6 = res.total_p6 or 0
-    satisfechos = res.satisfechos or 0
+    total_p6 = res.total_p6 or 0 if res else 0
+    satisfechos = res.satisfechos or 0 if res else 0
     satisfaction_pct = round((satisfechos / total_p6) * 100, 1) if total_p6 > 0 else 0.0
 
     return {
@@ -83,15 +80,17 @@ def obtener_kpis_tablero(db: Session, id_curso: int = None, fecha_inicio = None,
         "promoters_pct": promoters_pct,
         "detractors_pct": detractors_pct,
         "total_courses": total_cursos,
+        "platform": "campus_cordoba",
     }
 
 
-def obtener_desglose_preguntas(db: Session, id_curso: int = None, fecha_inicio = None, fecha_fin = None) -> list[dict]:
-    """Obtiene el desglose de preguntas con agregación directa en base de datos."""
+def obtener_desglose_preguntas(db: Session, id_curso: int = None, fecha_inicio = None, fecha_fin = None, plataforma: str = None) -> list[dict]:
+    """Obtiene el desglose de promedios y distribución para las preguntas numéricas de Campus Córdoba."""
     preguntas = db.query(Pregunta).filter(Pregunta.tipo == "numerica").order_by(Pregunta.nro_pregunta).all()
     if not preguntas:
         return []
 
+    # 1. Promedios y conteos numéricos
     q_avg = (
         db.query(
             Respuesta.id_pregunta,
@@ -101,16 +100,10 @@ def obtener_desglose_preguntas(db: Session, id_curso: int = None, fecha_inicio =
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
         .filter(Respuesta.valor_numerico.isnot(None))
     )
-
-    if id_curso:
-        q_avg = q_avg.filter(Encuesta.id_curso == id_curso)
-    if fecha_inicio:
-        q_avg = q_avg.filter(Encuesta.fecha_envio >= fecha_inicio)
-    if fecha_fin:
-        q_avg = q_avg.filter(Encuesta.fecha_envio <= fecha_fin)
-
+    q_avg = _filtrar_encuestas(q_avg, id_curso, fecha_inicio, fecha_fin)
     res_avg = {row.id_pregunta: (round(float(row.promedio), 2), row.conteo) for row in q_avg.group_by(Respuesta.id_pregunta).all()}
 
+    # 2. Distribución de 1 a 10
     q_dist = (
         db.query(
             Respuesta.id_pregunta,
@@ -120,13 +113,7 @@ def obtener_desglose_preguntas(db: Session, id_curso: int = None, fecha_inicio =
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
         .filter(Respuesta.valor_numerico.isnot(None))
     )
-    if id_curso:
-        q_dist = q_dist.filter(Encuesta.id_curso == id_curso)
-    if fecha_inicio:
-        q_dist = q_dist.filter(Encuesta.fecha_envio >= fecha_inicio)
-    if fecha_fin:
-        q_dist = q_dist.filter(Encuesta.fecha_envio <= fecha_fin)
-
+    q_dist = _filtrar_encuestas(q_dist, id_curso, fecha_inicio, fecha_fin)
     dist_map = {}
     for pid, val, cant in q_dist.group_by(Respuesta.id_pregunta, Respuesta.valor_numerico).all():
         if pid not in dist_map:
@@ -136,39 +123,41 @@ def obtener_desglose_preguntas(db: Session, id_curso: int = None, fecha_inicio =
 
     resultados = []
     for p in preguntas:
-        prom, total = res_avg.get(p.id, (0.0, 0))
+        prom, total_num = res_avg.get(p.id, (0.0, 0))
         dist = dist_map.get(p.id, {str(i): 0 for i in range(1, 11)})
+
         resultados.append({
             "question_number": p.nro_pregunta,
+            "platform": "campus_cordoba",
+            "type": p.tipo,
             "short_label": p.etiqueta_corta,
             "description": p.descripcion,
             "average": prom,
-            "count": total,
+            "count": total_num,
             "distribution": dist,
+            "text_options": [],
+            "text_count": 0,
+            "total_answers": total_num,
         })
 
     return resultados
 
 
-def obtener_comparativa_cursos(db: Session, fecha_inicio = None, fecha_fin = None) -> list[dict]:
-    """Compara todos los cursos en UNA SOLA consulta SQL agrupada."""
-    p6 = db.query(Pregunta.id).filter(Pregunta.nro_pregunta == 6).scalar()
-    p8 = db.query(Pregunta.id).filter(Pregunta.nro_pregunta == 8).scalar()
+def obtener_comparativa_cursos(db: Session, fecha_inicio = None, fecha_fin = None, plataforma: str = None) -> list[dict]:
+    """Compara todos los cursos en una sola consulta SQL agrupada."""
+    p6 = db.query(Pregunta.id).filter(Pregunta.plataforma == "campus_cordoba", Pregunta.nro_pregunta == 6).scalar()
+    p8 = db.query(Pregunta.id).filter(Pregunta.plataforma == "campus_cordoba", Pregunta.nro_pregunta == 8).scalar()
 
     q = (
         db.query(
             Curso.id,
             Curso.nombre,
             Curso.codigo,
-            Curso.institucion,
-            Curso.departamento,
             func.count(distinct(Encuesta.id)).label("total_encuestas"),
             func.avg(Respuesta.valor_numerico).label("prom_gral"),
-            # NPS
             func.sum(case((and_(Respuesta.id_pregunta == p8, Respuesta.valor_numerico >= 9), 1), else_=0)).label("promotores"),
             func.sum(case((and_(Respuesta.id_pregunta == p8, Respuesta.valor_numerico <= 6), 1), else_=0)).label("detractores"),
             func.sum(case((and_(Respuesta.id_pregunta == p8, Respuesta.valor_numerico.isnot(None)), 1), else_=0)).label("total_p8"),
-            # Satisfacción
             func.sum(case((and_(Respuesta.id_pregunta == p6, Respuesta.valor_numerico >= 8), 1), else_=0)).label("satisfechos"),
             func.sum(case((and_(Respuesta.id_pregunta == p6, Respuesta.valor_numerico.isnot(None)), 1), else_=0)).label("total_p6"),
         )
@@ -176,11 +165,7 @@ def obtener_comparativa_cursos(db: Session, fecha_inicio = None, fecha_fin = Non
         .join(Respuesta, Encuesta.id == Respuesta.id_encuesta)
     )
 
-    if fecha_inicio:
-        q = q.filter(Encuesta.fecha_envio >= fecha_inicio)
-    if fecha_fin:
-        q = q.filter(Encuesta.fecha_envio <= fecha_fin)
-
+    q = _filtrar_encuestas(q, None, fecha_inicio, fecha_fin)
     filas = q.group_by(Curso.id).all()
 
     lista_resumen = []
@@ -195,8 +180,8 @@ def obtener_comparativa_cursos(db: Session, fecha_inicio = None, fecha_fin = Non
             "id": r.id,
             "name": r.nombre,
             "code": r.codigo,
-            "institution": r.institucion,
-            "department": r.departamento,
+            "platform": "campus_cordoba",
+            "platform_label": "Campus Córdoba",
             "total_surveys": r.total_encuestas,
             "overall_average": round(float(r.prom_gral), 2) if r.prom_gral else 0.0,
             "nps": nps,
@@ -207,7 +192,7 @@ def obtener_comparativa_cursos(db: Session, fecha_inicio = None, fecha_fin = Non
     return lista_resumen
 
 
-def obtener_tendencias_temporales(db: Session, id_curso: int = None) -> list[dict]:
+def obtener_tendencias_temporales(db: Session, id_curso: int = None, plataforma: str = None) -> list[dict]:
     """Genera serie temporal agrupada directamente por SQL."""
     q = (
         db.query(
@@ -220,9 +205,7 @@ def obtener_tendencias_temporales(db: Session, id_curso: int = None) -> list[dic
         .filter(Respuesta.valor_numerico.isnot(None))
     )
 
-    if id_curso:
-        q = q.filter(Encuesta.id_curso == id_curso)
-
+    q = _filtrar_encuestas(q, id_curso, None, None)
     filas = q.group_by(Encuesta.periodo_anio, Encuesta.periodo_mes).order_by(Encuesta.periodo_anio, Encuesta.periodo_mes).all()
 
     return [
@@ -235,23 +218,18 @@ def obtener_tendencias_temporales(db: Session, id_curso: int = None) -> list[dic
     ]
 
 
-def obtener_insights_ia(db: Session, id_curso: int = None, fecha_inicio = None, fecha_fin = None) -> dict:
-    """Métricas de análisis de IA calculadas con conteos agregados por SQL."""
-    p9 = db.query(Pregunta.id).filter(Pregunta.nro_pregunta == 9).scalar()
-    if not p9:
-        return {"sentiment": {}, "topics": [], "summary": ""}
+def obtener_insights_ia(db: Session, id_curso: int = None, fecha_inicio = None, fecha_fin = None, plataforma: str = None) -> dict:
+    """Métricas de análisis de IA para comentarios de texto abierto unificados (Pregunta 9)."""
+    p_text_ids = [p.id for p in db.query(Pregunta.id).filter(Pregunta.tipo == "texto").all()]
+    if not p_text_ids:
+        return {"sentiment": {}, "topics": [], "summary": "", "negative_insights": {}}
 
     q_sent = (
         db.query(Respuesta.ai_sentimiento, func.count(Respuesta.id))
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
-        .filter(Respuesta.id_pregunta == p9, Respuesta.ai_sentimiento.isnot(None))
+        .filter(Respuesta.id_pregunta.in_(p_text_ids), Respuesta.ai_sentimiento.isnot(None))
     )
-    if id_curso:
-        q_sent = q_sent.filter(Encuesta.id_curso == id_curso)
-    if fecha_inicio:
-        q_sent = q_sent.filter(Encuesta.fecha_envio >= fecha_inicio)
-    if fecha_fin:
-        q_sent = q_sent.filter(Encuesta.fecha_envio <= fecha_fin)
+    q_sent = _filtrar_encuestas(q_sent, id_curso, fecha_inicio, fecha_fin)
 
     sentimientos = {"positivo": 0, "neutro": 0, "negativo": 0}
     for sent, cant in q_sent.group_by(Respuesta.ai_sentimiento).all():
@@ -261,37 +239,26 @@ def obtener_insights_ia(db: Session, id_curso: int = None, fecha_inicio = None, 
     q_top = (
         db.query(Respuesta.ai_tema, func.count(Respuesta.id))
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
-        .filter(Respuesta.id_pregunta == p9, Respuesta.ai_tema.isnot(None), Respuesta.ai_tema != "sin_comentario")
+        .filter(Respuesta.id_pregunta.in_(p_text_ids), Respuesta.ai_tema.isnot(None), Respuesta.ai_tema != "sin_comentario")
     )
-    if id_curso:
-        q_top = q_top.filter(Encuesta.id_curso == id_curso)
-    if fecha_inicio:
-        q_top = q_top.filter(Encuesta.fecha_envio >= fecha_inicio)
-    if fecha_fin:
-        q_top = q_top.filter(Encuesta.fecha_envio <= fecha_fin)
+    q_top = _filtrar_encuestas(q_top, id_curso, fecha_inicio, fecha_fin)
 
     lista_topicos = [
         {"topic": topic, "label": TOPIC_LABELS.get(topic, topic), "count": cant}
         for topic, cant in q_top.group_by(Respuesta.ai_tema).order_by(func.count(Respuesta.id).desc()).all()
     ]
 
-    # Desglose de respuestas negativas por temática
     q_neg_top = (
         db.query(Respuesta.ai_tema, func.count(Respuesta.id))
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
         .filter(
-            Respuesta.id_pregunta == p9,
+            Respuesta.id_pregunta.in_(p_text_ids),
             Respuesta.ai_sentimiento == "negativo",
             Respuesta.ai_tema.isnot(None),
             Respuesta.ai_tema != "sin_comentario"
         )
     )
-    if id_curso:
-        q_neg_top = q_neg_top.filter(Encuesta.id_curso == id_curso)
-    if fecha_inicio:
-        q_neg_top = q_neg_top.filter(Encuesta.fecha_envio >= fecha_inicio)
-    if fecha_fin:
-        q_neg_top = q_neg_top.filter(Encuesta.fecha_envio <= fecha_fin)
+    q_neg_top = _filtrar_encuestas(q_neg_top, id_curso, fecha_inicio, fecha_fin)
 
     negativos_por_tema = [
         {"topic": topic, "label": TOPIC_LABELS.get(topic, topic), "count": cant}
@@ -324,10 +291,10 @@ def obtener_insights_ia(db: Session, id_curso: int = None, fecha_inicio = None, 
     }
 
 
-def obtener_lista_comentarios(db: Session, id_curso: int = None, tema: str = None, sentimiento: str = None, busqueda: str = None, pagina: int = 1, tamanio_pagina: int = 50) -> dict:
+def obtener_lista_comentarios(db: Session, id_curso: int = None, tema: str = None, sentimiento: str = None, busqueda: str = None, plataforma: str = None, pagina: int = 1, tamanio_pagina: int = 50) -> dict:
     """Lista comentarios abiertos paginados de forma eficiente."""
-    p9 = db.query(Pregunta.id).filter(Pregunta.nro_pregunta == 9).scalar()
-    if not p9:
+    p_text_ids = [p.id for p in db.query(Pregunta.id).filter(Pregunta.tipo == "texto").all()]
+    if not p_text_ids:
         return {"total": 0, "items": []}
 
     query = (
@@ -335,14 +302,14 @@ def obtener_lista_comentarios(db: Session, id_curso: int = None, tema: str = Non
         .join(Encuesta, Respuesta.id_encuesta == Encuesta.id)
         .join(Curso, Encuesta.id_curso == Curso.id)
         .filter(
-            Respuesta.id_pregunta == p9,
+            Respuesta.id_pregunta.in_(p_text_ids),
             Respuesta.valor_texto.isnot(None),
             Respuesta.valor_texto != "",
         )
     )
 
-    if id_curso:
-        query = query.filter(Encuesta.id_curso == id_curso)
+    query = _filtrar_encuestas(query, id_curso, None, None)
+
     if tema and tema != "todos":
         query = query.filter(Respuesta.ai_tema == tema)
     if sentimiento and sentimiento != "todos":
@@ -359,6 +326,7 @@ def obtener_lista_comentarios(db: Session, id_curso: int = None, tema: str = Non
             "id": resp.id,
             "survey_id": survey.id,
             "source_id": survey.id_respuesta_origen,
+            "platform": "campus_cordoba",
             "course_name": course.nombre,
             "submitted_at": survey.fecha_envio.isoformat() if survey.fecha_envio else None,
             "text": resp.valor_texto,

@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import unicodedata
 import re
 import logging
@@ -29,8 +30,8 @@ def _normalizar_clave_curso(texto: str) -> str:
 
 def importar_archivos_masivos(db: Session, lista_archivos: list[tuple[bytes, str]]) -> dict:
     """
-    Procesa de forma ultra-rápida, segura y masiva una lista de archivos (CSV o Excel).
-    Aplica consultas raw de alta velocidad, inserción masiva directa y normalización de acentos.
+    Procesa de forma ultra-rápida, segura y masiva una lista de archivos (CSV o Excel),
+    soportando 'campus_cordoba' (9 preguntas) y 'campus_empleados' (5 preguntas).
     """
     if not lista_archivos:
         return {
@@ -44,9 +45,9 @@ def importar_archivos_masivos(db: Session, lista_archivos: list[tuple[bytes, str
             "files_details": [],
         }
 
-    # 1. Catálogo de preguntas oficiales
-    preguntas_raw = db.connection().execute(text("SELECT id_pregunta, nro_pregunta FROM preguntas")).fetchall()
-    mapa_preguntas = {nro: pid for pid, nro in preguntas_raw}
+    # 1. Catálogo de preguntas oficiales indexado por (plataforma, nro_pregunta)
+    preguntas_raw = db.connection().execute(text("SELECT id_pregunta, plataforma, nro_pregunta FROM preguntas")).fetchall()
+    mapa_preguntas = {(plat, nro): pid for pid, plat, nro in preguntas_raw}
 
     # 2. Cursos existentes indexados por clave normalizada (sin acentos)
     cursos_raw = db.connection().execute(text("SELECT id_curso, nombre_curso FROM cursos")).fetchall()
@@ -148,6 +149,7 @@ def importar_archivos_masivos(db: Session, lista_archivos: list[tuple[bytes, str
             cursos_totales.add(curso_info["nombre"])
 
             encuesta = Encuesta(
+                plataforma=item.get("plataforma", "campus_cordoba"),
                 id_respuesta_origen=src_id,
                 id_curso=curso_info["id"],
                 fecha_envio=item["fecha_envio"],
@@ -156,7 +158,7 @@ def importar_archivos_masivos(db: Session, lista_archivos: list[tuple[bytes, str
                 periodo_semana=item["periodo_semana"],
             )
             encuestas_para_insertar.append(encuesta)
-            respuestas_preparadas_por_encuesta.append(item["respuestas"])
+            respuestas_preparadas_por_encuesta.append((item.get("plataforma", "campus_cordoba"), item["respuestas"]))
 
             ids_origen_existentes.add(src_id)
             arch_importadas += 1
@@ -165,22 +167,26 @@ def importar_archivos_masivos(db: Session, lista_archivos: list[tuple[bytes, str
         BATCH_SIZE = 500
         for i in range(0, len(encuestas_para_insertar), BATCH_SIZE):
             lote_enc = encuestas_para_insertar[i:i + BATCH_SIZE]
-            lote_resp = respuestas_preparadas_por_encuesta[i:i + BATCH_SIZE]
+            lote_resp_info = respuestas_preparadas_por_encuesta[i:i + BATCH_SIZE]
 
             db.add_all(lote_enc)
-            db.flush()  # Obtiene todos los IDs generados por MySQL en un solo viaje
+            db.flush()
 
             respuestas_batch_mappings = []
-            for enc_obj, resp_list in zip(lote_enc, lote_resp):
+            for enc_obj, (plat, resp_list) in zip(lote_enc, lote_resp_info):
                 for ans in resp_list:
                     q_num = ans["nro_pregunta"]
-                    p_id = mapa_preguntas.get(q_num)
+                    p_id = mapa_preguntas.get((plat, q_num))
+                    if not p_id:
+                        # Fallback por si la pregunta fue registrada solo con nro
+                        p_id = mapa_preguntas.get(("campus_cordoba", q_num))
                     if not p_id:
                         continue
 
                     tema = None
                     sent = None
-                    if q_num == 9:
+                    es_pregunta_ia = (q_num == 9)
+                    if es_pregunta_ia:
                         if not ans["valor_texto"] or ans.get("es_ruido", False):
                             tema = "sin_comentario"
                             sent = "neutro"
@@ -212,6 +218,23 @@ def importar_archivos_masivos(db: Session, lista_archivos: list[tuple[bytes, str
             "courses_affected": list(arch_cursos_afectados),
         })
 
+    # Disparar análisis de IA en segundo plano de forma asíncrona para respuesta ultra veloz
+    import threading
+    def _analizar_ia_segundo_plano():
+        try:
+            from app.db.base import SessionLocal
+            from app.ai.servicio import procesar_comentarios_pendientes
+            db_bg = SessionLocal()
+            try:
+                procesar_comentarios_pendientes(db_bg, limite=3000)
+            finally:
+                db_bg.close()
+        except Exception as e_ia:
+            logger.warning(f"No se pudo completar el análisis de IA en segundo plano: {e_ia}")
+
+    thread_ia = threading.Thread(target=_analizar_ia_segundo_plano, daemon=True)
+    thread_ia.start()
+
     return {
         "success": True,
         "message": f"Proceso masivo finalizado: {len(lista_archivos)} archivo(s) procesados. {total_importadas} encuestas nuevas importadas ({total_duplicadas} duplicadas ignoradas).",
@@ -225,7 +248,7 @@ def importar_archivos_masivos(db: Session, lista_archivos: list[tuple[bytes, str
 
 
 def importar_archivo_encuesta(db: Session, contenido_archivo: bytes, nombre_archivo: str) -> dict:
-    """Importa un archivo individual reutilizando el motor masivo de alta velocidad."""
+    """Importa un archivo individual reutilizando el motor masivo."""
     res = importar_archivos_masivos(db, [(contenido_archivo, nombre_archivo)])
     if res.get("files_details"):
         return res["files_details"][0]
